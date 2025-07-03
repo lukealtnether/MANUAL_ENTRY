@@ -5,8 +5,6 @@ library(jsonvalidate)
 library(readxl)
 library(writexl)
 library(tidyverse)
-library(ollamar)
-library(httr2)
 library(arsenal)
 
 
@@ -42,7 +40,7 @@ ui <-
 ")),
     
     fluidRow(
-      column(4, fileInput(("schema_file"), "Upload JSON Schema (.json)")),
+      column(4, fileInput(("schema_file"), "Upload JSON Schema (.json/.txt)")),
       column(4, fileInput(("empty_examples"), "Upload Examples (.xlsx)")),
       column(4, fileInput(("prompt_text_file"), "Upload Prompt (.txt)"))
       ),
@@ -169,7 +167,7 @@ server <- function(input, output, session) {
     
     # Ensure file has a .json extension
     ext <- tools::file_ext(input$schema_file$name)
-    if (tolower(ext) != "json") {
+    if (tolower(ext) != "json" & tolower(ext) != "txt") {
       showModal(modalDialog(
         title = "Invalid file type",
         "Please upload a valid .json schema file.",
