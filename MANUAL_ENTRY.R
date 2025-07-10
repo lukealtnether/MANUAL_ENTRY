@@ -41,7 +41,8 @@ ui <-
     
     fluidRow(
       column(4, fileInput(("schema_file"), "Upload JSON Schema (.json/.txt)")),
-      column(4, fileInput(("empty_examples"), "Upload Examples (.xlsx)")),
+      column(4, fileInput(("mydata"), "Upload Reports (.xlsx)"),
+      uiOutput("column_selector")),
       column(4, fileInput(("prompt_text_file"), "Upload Prompt (.txt)"))
       ),
     h4("Prompt"),
@@ -57,11 +58,15 @@ ui <-
           ),
         textOutput(("example_counter"))),
       column(4, 
-        uiOutput(("dynamic_form")),
-        actionButton(("add_row"), "Add Row", class = "btn btn-success"),
-        actionButton(("remove_row"), "Remove Last Row", class = "btn btn-danger"),
-        h4("Preview"),
-        verbatimTextOutput(("data_output")))),
+             div(
+               style = "max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; background-color: #f9f9f9; border-radius: 4px; margin-bottom: 10px;",
+               uiOutput("dynamic_form")
+             ),
+             actionButton("add_row", "Add Row", class = "btn btn-success"),
+             actionButton("remove_row", "Remove Last Row", class = "btn btn-danger"),
+             h4("Preview"),
+             verbatimTextOutput("data_output")
+      )),
     tags$hr(),
     textInput(("filename_xlsx"), "Enter file name (without exteion):", value = ""),
     downloadButton(("download_xlsx"), "Download XLSX for Validation")
@@ -85,6 +90,7 @@ server <- function(input, output, session) {
   validation_messages <- reactiveVal(list())
   add_row_toggle <- reactiveVal(list())
   prompt_text <- reactiveVal("")
+  uploaded_data <- reactiveVal(NULL)
   
   observeEvent(input$prompt_text_file, {
     req(input$prompt_text_file)
@@ -111,21 +117,19 @@ server <- function(input, output, session) {
         footer = NULL
       ))
     })
-  })
-  
-  
-  output$prompt_text <- renderText({
-    prompt_text()
+    output$prompt_text <- renderText({
+      prompt_text()
+    })
   })
   
   
   
   # input examples and json
-  observeEvent(input$empty_examples, {
-    req(input$empty_examples)
+  observeEvent(input$mydata, {
+    req(input$mydata)
     
     # Ensure it's an .xlsx file
-    ext <- tools::file_ext(input$empty_examples$name)
+    ext <- tools::file_ext(input$mydata$name)
     if (tolower(ext) != "xlsx") {
       showModal(modalDialog(
         title = "Invalid file type",
@@ -138,12 +142,16 @@ server <- function(input, output, session) {
     
     # Try reading the file safely
     tryCatch({
-      df <- readxl::read_excel(input$empty_examples$datapath, col_names = FALSE)
+      df <- readxl::read_excel(input$mydata$datapath)
+      
+        output$column_selector <- renderUI({
+    req(uploaded_data())
+    selectInput("selected_column", "Select Column", choices = colnames(uploaded_data()))
+  })
+      
       
       if (ncol(df) >= 1) {
-        example_data(df[[1]])
-        example_index(1)
-        manual_times(numeric(length(df[[1]])))
+        uploaded_data(df)
       } else {
         showModal(modalDialog(
           title = "Invalid file content",
@@ -160,6 +168,22 @@ server <- function(input, output, session) {
         footer = NULL
       ))
     })
+  })
+  
+  output$column_selector <- renderUI({
+    req(uploaded_data())
+    selectInput("selected_column", "Select Column", choices = colnames(uploaded_data()))
+  })
+  
+  observeEvent(input$selected_column, {
+    df <- uploaded_data()
+    req(df, input$selected_column)
+    
+    selected_col_data <- df[[input$selected_column]]
+    
+    example_data(selected_col_data)
+    example_index(1)
+    manual_times(numeric(length(selected_col_data)))
   })
   
   observeEvent(input$schema_file, {
@@ -237,6 +261,23 @@ server <- function(input, output, session) {
     current[[idx]] <- val
     validation_messages(current)
   }
+  
+  observe({
+    # Check if all inputs are available
+    all_inputs_present <- !is.null(input$schema_file) &&
+      !is.null(input$mydata) &&
+      !is.null(input$prompt_text_file) &&
+      !is.null(input$selected_column)
+    
+    if (all_inputs_present) {
+      shinyjs::enable("previous_button")
+    } else {
+      shinyjs::disable("previous_button")
+    }
+  })
+  
+  
+  
   
   # Navigation buttons
   observeEvent(input$previous_button, {
