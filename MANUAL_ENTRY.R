@@ -62,7 +62,7 @@ ui <-
                style = "max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; background-color: #f9f9f9; border-radius: 4px; margin-bottom: 10px;",
                uiOutput("dynamic_form")
              ),
-             actionButton("add_row", "Add Row", class = "btn btn-success"),
+             actionButton("add_row", "Save/Add Row", class = "btn btn-success"),
              actionButton("remove_row", "Remove Last Row", class = "btn btn-danger"),
              h4("Preview"),
              verbatimTextOutput("data_output")
@@ -83,6 +83,7 @@ server <- function(input, output, session) {
   example_index <- reactiveVal(1)
   timer_start <- reactiveVal(NULL)
   manual_times <- reactiveVal(numeric())  
+
   
   # Store a separate entries dataframe, invalid cells, and messages per example
   entries_list <- reactiveVal(list())
@@ -152,6 +153,10 @@ server <- function(input, output, session) {
       
       if (ncol(df) >= 1) {
         uploaded_data(df)
+        
+        #update file name in filename_xlsx to match uploaded file + "reviewed"
+        updateTextInput(session, "filename_xlsx", value = paste0(tools::file_path_sans_ext(input$mydata$name), "_reviewed"))
+        
       } else {
         showModal(modalDialog(
           title = "Invalid file content",
@@ -168,6 +173,7 @@ server <- function(input, output, session) {
         footer = NULL
       ))
     })
+    
   })
   
   output$column_selector <- renderUI({
@@ -292,7 +298,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$next_button, {
-    req(example_data())
+    req(example_data(),schema())
     i <- example_index()
     
     # Stop timer and record
@@ -311,6 +317,7 @@ server <- function(input, output, session) {
     
     # Reset timer and hide text
     timer_start(NULL)
+
   })
   
   
@@ -368,6 +375,8 @@ server <- function(input, output, session) {
         field$anyOf, function(x) is.list(x) && identical(x$type, "null"), logical(1)
       ))
       
+      label <- if (!allows_null) paste0(label, " (required)") else label
+      
       enum_choices <- NULL
       if (!is.null(field$enum)) {
         enum_choices <- field$enum
@@ -375,6 +384,8 @@ server <- function(input, output, session) {
         enum_choices <- unlist(lapply(field$anyOf, function(x) x$enum), use.names = FALSE)
         enum_choices <- unique(enum_choices[!is.na(enum_choices) & enum_choices != "null"])
       }
+      
+      
       
       input_ui <- if (!is.null(enum_choices) && length(enum_choices) > 0) {
         selectInput(input_id, NULL, choices = c("", enum_choices))
@@ -384,23 +395,25 @@ server <- function(input, output, session) {
         textInput(input_id, NULL)
       }
       
-      conditional_input <- if (allows_null) {
-        tagList(
-          checkboxInput(null_id, "Null", value = FALSE),
-          conditionalPanel(
-            condition = paste0("!input['", null_id, "']"),
-            input_ui
-          )
-        )
-      } else {
-        input_ui
-      }
-      
-      tagList(label, conditional_input)
+      # conditional_input <- if (allows_null) {
+      #   tagList(
+      #     checkboxInput(null_id, "Null", value = TRUE),
+      #     conditionalPanel(
+      #       condition = paste0("!input['", null_id, "']"),
+      #       input_ui
+      #     )
+      #   )
+      # } else {
+      #   input_ui
+      # }
+      # 
+      tagList(label, input_ui)
+      # tagList(label, conditional_input)
     })
   }
   
   output$dynamic_form <- renderUI({
+    example_index()
     req(schema())
     props <- get_schema_properties(schema())
     do.call(tagList, generateFormInputs(props, prefix = "row_"))
@@ -417,8 +430,9 @@ server <- function(input, output, session) {
     
     for (p in props) {
       input_id <- paste0("row_", p)
-      null_check <- input[[paste0(input_id, "_null")]]
-      val <- if (!is.null(null_check) && null_check) NA else input[[input_id]]
+      # null_check <- input[[paste0(input_id, "_null")]]
+      null_check <- is.null(input[[input_id]])
+      val <- if (is.null(null_check) && null_check) NA else input[[input_id]]
       row[[p]] <- val
     }
     

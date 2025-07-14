@@ -5,7 +5,7 @@ account: crystalball
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 15030120
-bundleId: 10597100
+bundleId: 10614298
 url: https://crystalball.shinyapps.io/MANUAL_ENTRY/
 version: 1
 asMultiple: FALSE
