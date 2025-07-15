@@ -56,7 +56,9 @@ ui <-
           column(6, actionButton(("previous_button"), "START", style = "width: 100%;", class = "btn btn-success")),
           column(6, actionButton(("next_button"), "STOP/NEXT", style = "width: 100%;", class = "btn btn-danger"))
           ),
-        textOutput(("example_counter"))),
+        textOutput(("example_counter")),
+        h4("Preview"),
+        verbatimTextOutput("data_output")),
       column(4, 
              div(
                style = "max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; background-color: #f9f9f9; border-radius: 4px; margin-bottom: 10px;",
@@ -64,12 +66,10 @@ ui <-
              ),
              actionButton("add_row", "Save/Add Row", class = "btn btn-success"),
              actionButton("remove_row", "Remove Last Row", class = "btn btn-danger"),
-             h4("Preview"),
-             verbatimTextOutput("data_output")
-      )),
-    tags$hr(),
-    textInput(("filename_xlsx"), "Enter file name (without exteion):", value = ""),
-    downloadButton(("download_xlsx"), "Download XLSX for Validation")
+             tags$hr(),
+             textInput(("filename_xlsx"), "Enter file name (without exteion):", value = ""),
+             downloadButton(("download_xlsx"), "Download XLSX for Validation")
+      ))
       )
 
 
@@ -390,9 +390,9 @@ server <- function(input, output, session) {
       input_ui <- if (!is.null(enum_choices) && length(enum_choices) > 0) {
         selectInput(input_id, NULL, choices = c("", enum_choices))
       } else if (!is.null(field$pattern)) {
-        textInput(input_id, NULL)
+        textInput(input_id, label = NULL,value = NULL)
       } else {
-        textInput(input_id, NULL)
+        textInput(input_id, label = NULL, value = NULL)
       }
       
       # conditional_input <- if (allows_null) {
@@ -406,7 +406,7 @@ server <- function(input, output, session) {
       # } else {
       #   input_ui
       # }
-      # 
+
       tagList(label, input_ui)
       # tagList(label, conditional_input)
     })
@@ -431,8 +431,8 @@ server <- function(input, output, session) {
     for (p in props) {
       input_id <- paste0("row_", p)
       # null_check <- input[[paste0(input_id, "_null")]]
-      null_check <- is.null(input[[input_id]])
-      val <- if (is.null(null_check) && null_check) NA else input[[input_id]]
+      null_check <- is.null(input[[input_id]]) | is.na(input[[input_id]]) | input[[input_id]] == ""
+      val <- if (null_check) NA else input[[input_id]]
       row[[p]] <- val
     }
     
